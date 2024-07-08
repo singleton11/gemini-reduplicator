@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        
+        {
+            "name": "Build gemini-reduplicator",
+            "type": "amper",
+            "workingDir": "$PROJECT_DIR$",
+            "tasks": [":gemini-reduplicator:compileJvm"]
+        },
+        {
+            "name": "Run",
+            "type": "jps-run",
+            "workingDir": "$PROJECT_DIR$",
+            "dependsOn": ["Build gemini-reduplicator"],
+            "mainClass": "MainKt",
+            "module": "gemini-reduplicator.jvm",
+            "options": ["-Dfile.encoding=UTF-8", "-Dsun.stdout.encoding=UTF-8", "-Dsun.stderr.encoding=UTF-8"]
+        }
+    ]
+}
