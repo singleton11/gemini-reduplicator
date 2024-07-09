@@ -1,14 +1,14 @@
 product: jvm/app
 
 dependencies:
-    - io.ktor:ktor-client-core:2.3.12
-    - io.ktor:ktor-client-cio:2.3.12
-    - io.ktor:ktor-client-resources:2.3.12
-    - io.ktor:ktor-client-content-negotiation:2.3.12
-    - io.ktor:ktor-serialization-kotlinx-json:2.3.12
-    - io.ktor:ktor-client-logging:2.3.12
+    - $libs.ktor.client.core
+    - $libs.ktor.client.cio
+    - $libs.ktor.client.resources
+    - $libs.ktor.client.content.negotiation
+    - $libs.ktor.serialization.kotlinx.json
+    - $libs.ktor.client.logging
     # logging
-    - ch.qos.logback:logback-classic:1.5.6
+    - $libs.logback.classic
 
 settings:
     kotlin:
