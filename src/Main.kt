@@ -86,7 +86,7 @@ suspend fun huefy(phrase: String): String? {
 fun main(args: Array<String>) {
     val bot = bot {
         logLevel = LogLevel.All()
-        token = System.getProperty("TELEGRAM_TOKEN")
+        token = System.getenv("TELEGRAM_TOKEN")
         dispatch {
             message {
                 runBlocking {
