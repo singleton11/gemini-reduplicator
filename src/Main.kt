@@ -1,4 +1,5 @@
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -22,6 +23,7 @@ val httpClient = HttpClient(CIO) {
         json(Json {
             prettyPrint = true
             isLenient = true
+            ignoreUnknownKeys = true
         })
     }
     install(Logging)
@@ -33,31 +35,36 @@ val httpClient = HttpClient(CIO) {
 data class GeminiRequestResource(val key: String = geminiApiKey)
 
 @Serializable
-data class GeminiRequest(val contents: List<GeminiContent>) {
+data class GeminiContent(val parts: List<GeminiPart>) {
     @Serializable
-    data class GeminiContent(val parts: List<GeminiPart>) {
-        @Serializable
-        data class GeminiPart(val text: String)
-    }
+    data class GeminiPart(val text: String)
 }
 
-fun main(args: Array<String>) {
+@Serializable
+data class GeminiRequest(val contents: List<GeminiContent>)
 
-    val prompt = object {}
-    .javaClass
-    .getResource("prompt-template.txt")
-    ?.readText()
-    ?.replace("{{ placeholder }}", "как дела?") ?: error("Can not build prompt")
+@Serializable
+data class GeminiResponse(val candidates: List<GeminiCandidate>) {
+    @Serializable
+    data class GeminiCandidate(val content: GeminiContent)
+}
 
-    runBlocking {
-        val response = httpClient.post(GeminiRequestResource()) {
+val promptTemplate = object {}
+        .javaClass
+        .getResource("prompt-template.txt")
+        ?.readText()
+
+suspend fun huefy(phrase: String): String? {
+    val prompt = promptTemplate
+        ?.replace("{{ placeholder }}", phrase) ?: error("Can not build prompt")
+    val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
             setBody(
                 GeminiRequest(
                     listOf(
-                        GeminiRequest.GeminiContent(
+                        GeminiContent(
                             listOf(
-                                GeminiRequest.GeminiContent.GeminiPart(prompt)
+                                GeminiContent.GeminiPart(prompt)
                             )
                         )
                     )
@@ -65,7 +72,12 @@ fun main(args: Array<String>) {
             )
         }
 
-        val text = response.bodyAsText()
-        println(text)
+        val resp = response.body<GeminiResponse>()
+        return resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
+}
+
+fun main(args: Array<String>) {
+    runBlocking {
+        println(huefy("Ну ты и приколист!"))
     }
 }
