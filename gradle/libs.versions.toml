@@ -1,6 +1,7 @@
 [versions]
 ktor="2.3.12"
 logback = "1.5.6"
+telegram = "6.1.0"
 
 
 [libraries]
@@ -11,3 +12,4 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+telegram = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram", version.ref="telegram" }

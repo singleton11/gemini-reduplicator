@@ -10,7 +10,7 @@ dependencies:
     - $libs.ktor.client.logging
     - $libs.logback.classic
     # telegram
-    - io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0
+    - $libs.telegram
 
 settings:
     kotlin:
