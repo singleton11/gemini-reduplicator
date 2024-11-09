@@ -1,0 +1,8 @@
+type: jvm/external-task
+
+module: ./uber-jar
+
+programArguments:
+  - ${outputDirectory}
+  - ${module(.).runtimeClasspathJvm}
+
