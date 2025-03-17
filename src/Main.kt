@@ -92,7 +92,7 @@ fun main(args: Array<String>) {
                 runBlocking {
                     val huefied = message.text?.let { huefy(it) }
                     if (huefied != null) {
-                        bot.sendMessage(ChatId.fromId(message.chat.id), huefied)
+                        bot.sendMessage(ChatId.fromId(message.chat.id), huefied, replyToMessageId = message.messageId)
                     }
                 }
             }
