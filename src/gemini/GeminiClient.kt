@@ -77,7 +77,7 @@ class GeminiClient {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
         } catch (e: JsonConvertException) {
-            println("Error processing text with Gemini: ${e.message}")
+            AppConfig.logger.error("Error processing text with Gemini: ${e.message}", e)
             null
         }
     }
@@ -86,7 +86,7 @@ class GeminiClient {
         val prompt = imagePromptTemplate ?: error("Cannot build image prompt")
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
         
-        println("Processing image of size ${imageBytes.size} bytes with MIME type: $mimeType")
+        AppConfig.logger.info("Processing image of size ${imageBytes.size} bytes with MIME type: $mimeType")
         
         val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
@@ -113,8 +113,7 @@ class GeminiClient {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
         } catch (e: Exception) {
-            println("Error processing image with Gemini: ${e.message}")
-            e.printStackTrace()
+            AppConfig.logger.error("Error processing image with Gemini: ${e.message}", e)
             null
         }
     }

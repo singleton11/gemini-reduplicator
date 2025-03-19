@@ -43,11 +43,11 @@ class TelegramService {
             // Download file
             if (filePath != null) {
                 val path = filePath.content
-                println("Downloading $fileType from path: $path")
+                AppConfig.logger.info("Downloading $fileType from path: $path")
                 val fileUrl = "https://api.telegram.org/file/bot$telegramToken/$path"
                 val fileResponse = httpClient.get(fileUrl)
                 val bytes = fileResponse.readBytes()
-                println("Downloaded ${bytes.size} bytes")
+                AppConfig.logger.info("Downloaded ${bytes.size} bytes")
                 
                 // Determine MIME type based on file extension
                 val mimeType = when {
@@ -59,14 +59,13 @@ class TelegramService {
                     else -> "image/jpeg" // Default
                 }
                 
-                println("Detected MIME type: $mimeType")
+                AppConfig.logger.info("Detected MIME type: $mimeType")
                 return FileInfo(bytes, mimeType)
             } else {
-                println("Could not get file path from Telegram API response for $fileType")
+                AppConfig.logger.warn("Could not get file path from Telegram API response for $fileType")
             }
         } catch (e: Exception) {
-            println("Error downloading $fileType: ${e.message}")
-            e.printStackTrace()
+            AppConfig.logger.error("Error downloading $fileType: ${e.message}", e)
         }
         return null
     }
@@ -74,10 +73,10 @@ class TelegramService {
     suspend fun downloadImage(message: Message): FileInfo? {
         val photoSize = message.photo?.maxByOrNull { it.width * it.height }
         return if (photoSize != null) {
-            println("Found photo with dimensions: ${photoSize.width}x${photoSize.height}")
+            AppConfig.logger.info("Found photo with dimensions: ${photoSize.width}x${photoSize.height}")
             downloadFileById(photoSize.fileId, "photo")
         } else {
-            println("No photo found in message")
+            AppConfig.logger.warn("No photo found in message")
             null
         }
     }
@@ -85,10 +84,10 @@ class TelegramService {
     suspend fun downloadSticker(message: Message): FileInfo? {
         val sticker = message.sticker
         return if (sticker != null) {
-            println("Found sticker: ${sticker.emoji ?: ""} (${sticker.width}x${sticker.height})")
+            AppConfig.logger.info("Found sticker: ${sticker.emoji ?: ""} (${sticker.width}x${sticker.height})")
             downloadFileById(sticker.fileId, "sticker")
         } else {
-            println("No sticker found in message")
+            AppConfig.logger.warn("No sticker found in message")
             null
         }
     }

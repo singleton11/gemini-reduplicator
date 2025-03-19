@@ -54,7 +54,7 @@ class BotService(
             }
         }
         
-        println("Starting Telegram bot...")
+        AppConfig.logger.info("Starting Telegram bot...")
         bot.startPolling()
     }
 }
