@@ -4,15 +4,22 @@ import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.logging.LogLevel
 import config.AppConfig
 import gemini.GeminiClient
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import utils.MessageBuffer
 
 class BotService(
     private val geminiClient: GeminiClient,
-    private val telegramService: TelegramService
+    private val telegramService: TelegramService,
+    private val throttleTimeMs: Long = 5000 // Default 5 seconds throttling
 ) {
+    private val messageBuffer = MessageBuffer(throttleTimeMs)
+    private val processingScope = CoroutineScope(Dispatchers.IO)
     private val botToken = AppConfig.telegramToken
     
     fun startBot() {
@@ -21,33 +28,13 @@ class BotService(
             token = botToken
             dispatch {
                 message {
-                    runBlocking {
-                        // Handle text messages
-                        if (message.text != null) {
-                            val huefied = geminiClient.generateTextResponse(message.text!!)
-                            if (huefied != null) {
-                                bot.sendMessage(ChatId.fromId(message.chat.id), huefied, replyToMessageId = message.messageId)
-                            }
-                        }
-                        // Handle image messages
-                        else if (message.photo != null) {
-                            val fileInfo = telegramService.downloadImage(message)
-                            if (fileInfo != null) {
-                                val huefied = geminiClient.generateImageResponse(fileInfo.bytes, fileInfo.mimeType)
-                                if (huefied != null) {
-                                    bot.sendMessage(ChatId.fromId(message.chat.id), huefied, replyToMessageId = message.messageId)
-                                }
-                            }
-                        }
-                        // Handle sticker messages
-                        else if (message.sticker != null) {
-                            val fileInfo = telegramService.downloadSticker(message)
-                            if (fileInfo != null) {
-                                val huefied = geminiClient.generateImageResponse(fileInfo.bytes, fileInfo.mimeType)
-                                if (huefied != null) {
-                                    bot.sendMessage(ChatId.fromId(message.chat.id), huefied, replyToMessageId = message.messageId)
-                                }
-                            }
+                    // Launch in a coroutine to avoid blocking the bot
+                    processingScope.launch {
+                        val chatId = message.chat.id
+                        
+                        // Buffer the message and check if we should process now
+                        if (messageBuffer.bufferMessage(chatId, message)) {
+                            processMessageBatch(bot, chatId)
                         }
                     }
                 }
@@ -56,5 +43,37 @@ class BotService(
         
         AppConfig.logger.info("Starting Telegram bot...")
         bot.startPolling()
+    }
+    
+    /**
+     * Process a batch of messages for a specific chat
+     */
+    private suspend fun processMessageBatch(bot: com.github.kotlintelegrambot.Bot, chatId: Long) {
+        // Get all buffered messages
+        val messages = messageBuffer.getAndClearMessages(chatId)
+        
+        if (messages.isEmpty()) {
+            AppConfig.logger.debug("No messages to process for chat $chatId")
+            return
+        }
+        
+        // Log how many messages we're processing
+        AppConfig.logger.info("Processing batch of ${messages.size} messages for chat $chatId")
+        
+        // Process the batch
+        val response = geminiClient.processBatchMessages(messages, telegramService)
+        
+        // Send the response
+        if (response != null) {
+            // Reply to the last message in the batch
+            val replyToMessageId = messages.lastOrNull()?.messageId
+            bot.sendMessage(
+                ChatId.fromId(chatId),
+                response,
+                replyToMessageId = replyToMessageId
+            )
+        } else {
+            AppConfig.logger.warn("Failed to get response from Gemini for chat $chatId batch")
+        }
     }
 }
