@@ -11,6 +11,10 @@ import io.ktor.serialization.*
 import kotlinx.serialization.Serializable
 import java.util.Base64
 import com.github.kotlintelegrambot.entities.Message
+import io.ktor.client.plugins.timeout
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.DurationUnit
 
 @Resource("/v1beta/models/gemini-2.5-flash:generateContent")
 data class GeminiRequestResource(val key: String = AppConfig.geminiApiKey)
@@ -85,6 +89,9 @@ class GeminiClient {
                     )
                 )
             )
+            timeout {
+                requestTimeoutMillis = 10.seconds.inWholeMilliseconds
+            }
         }
         
         return try {
