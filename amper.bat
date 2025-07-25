@@ -16,13 +16,13 @@
 setlocal
 
 @rem The version of the Amper distribution to provision and use
-set amper_version=0.6.0-dev-2550
+set amper_version=0.8.0-dev-2999
 @rem Establish chain of trust from here by specifying exact checksum of Amper distribution to be run
-set amper_sha256=f0da3bd6d8258c4ada1693742592ba94bad344a31c3e679b14d2fd60c80c1d13
+set amper_sha256=c2f8303e43857e439d5193d87b4620341e9b6465b24bf6f219aed63cf68a16fd
 
 if not defined AMPER_DOWNLOAD_ROOT set AMPER_DOWNLOAD_ROOT=https://packages.jetbrains.team/maven/p/amper/amper
 if not defined AMPER_JRE_DOWNLOAD_ROOT set AMPER_JRE_DOWNLOAD_ROOT=https:/
-if not defined AMPER_BOOTSTRAP_CACHE_DIR set AMPER_BOOTSTRAP_CACHE_DIR=%LOCALAPPDATA%\Amper
+if not defined AMPER_BOOTSTRAP_CACHE_DIR set AMPER_BOOTSTRAP_CACHE_DIR=%LOCALAPPDATA%\JetBrains\Amper
 @rem remove trailing \ if present
 if [%AMPER_BOOTSTRAP_CACHE_DIR:~-1%] EQU [\] set AMPER_BOOTSTRAP_CACHE_DIR=%AMPER_BOOTSTRAP_CACHE_DIR:~0,-1%
 
@@ -117,7 +117,7 @@ exit /b 1
 
 REM ********** Provision Amper distribution **********
 
-set amper_url=%AMPER_DOWNLOAD_ROOT%/org/jetbrains/amper/cli/%amper_version%/cli-%amper_version%-dist.tgz
+set amper_url=%AMPER_DOWNLOAD_ROOT%/org/jetbrains/amper/amper-cli/%amper_version%/amper-cli-%amper_version%-dist.tgz
 set amper_target_dir=%AMPER_BOOTSTRAP_CACHE_DIR%\amper-cli-%amper_version%
 call :download_and_extract "Amper distribution v%amper_version%" "%amper_url%" "%amper_target_dir%" "%amper_sha256%" "256"
 if errorlevel 1 goto fail
@@ -127,24 +127,22 @@ REM ********** Provision JRE for Amper **********
 if defined AMPER_JAVA_HOME goto jre_provisioned
 
 @rem Auto-updated from syncVersions.main.kts, do not modify directly here
-set jbr_version=21.0.4
-set jbr_build=b509.26
+set jbr_version=21.0.6
+set jbr_build=b895.97
 if "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
     set jbr_arch=aarch64
-    set jbr_sha512=9fd2333f3d55f0d40649435fc27e5ab97ad44962f54c1c6513e66f89224a183cd0569b9a3994d840b253060d664630610f82a02f45697e5e6c0b4ee250dd1857
+    set jbr_sha512=188bb92c35bc31b8ec9596701b498797c6578fb8513f1a854a2c8501ff3d2883a1fc74d24c45322526cdaaeb86940fffaf9729f39ba8dd52dd0f2b6f63da35fe
 ) else if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
     set jbr_arch=x64
-    set jbr_sha512=6a639d23039b83cf1b0ed57d082bb48a9bff6acae8964192a1899e8a1c0915453199b501b498e5874bc57c9996d871d49f438054b3c86f643f1c1c4f178026a3
+    set jbr_sha512=7e71a463327a92e6974b3d1013efde00f9d852660d5a18eae5765534b6d3cf0de471f72fd30d3caae910253b8b0df7202e2a76f0435e84ad80d13fb298a84c48
 ) else (
     echo Unknown Windows architecture %PROCESSOR_ARCHITECTURE% >&2
     goto fail
 )
 
-REM !! DO NOT REMOVE !! -----------------------------------------------------------------------------------------------
-REM -------------------------------------------------------------------------------------------------------------------
-REM -------------------------------------------------------------------------------------------------------------------
-REM                                                 exit /b %ERRORLEVEL%
-REM                                            6788 ^
+REM !! DO NOT REMOVE !!
+REM                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          exit /b %ERRORLEVEL%
+REM
 REM The above comment is strategically placed to compensate for a bug in the update command in Amper 0.5.0.
 REM During the update, the wrapper script is overwritten in-place while running. The problem is that cmd.exe doesn't
 REM buffer the original script as a whole, and instead reloads it after every command, and tries to resume at the same
@@ -152,10 +150,9 @@ REM byte offset as before.
 REM In the 0.5.0 script, the java command running Amper is followed by the command 'exit /b %ERRORLEVEL%', which is
 REM exactly at the byte offset 6826. So, when the java command finishes, cmd.exe wants to run this exit command, but
 REM it first reloads the file and gets the new content (this one) before trying to run whatever is at offset 6826.
-REM This position is marked above, and we must place an exit command right there to allow 0.5.0 to complete properly.
-REM Since we usually edit the _template_ of the wrapper script, we need to take into account the difference between
-REM the version and checksum placeholders and their real value (38 chars at the moment).
-REM The position in the wrapper template should therefore be 6788, so it ends up at 6826 in the final script.
+REM We must place an exit command right at that offset to allow 0.5.0 to complete properly.
+REM Since there are version/checksum placeholders at the top of this template wrapper file, we need to dynamically
+REM adjust the position of the exit command, hence the padding placeholder.
 
 @rem URL for JBR (vanilla) - see https://github.com/JetBrains/JetBrainsRuntime/releases
 set jbr_url=%AMPER_JRE_DOWNLOAD_ROOT%/cache-redirector.jetbrains.com/intellij-jbr/jbr-%jbr_version%-windows-%jbr_arch%-%jbr_build%.tar.gz
@@ -174,5 +171,5 @@ if not exist "%AMPER_JAVA_HOME%\bin\java.exe" (
 REM ********** Launch Amper **********
 
 set jvm_args=-ea -XX:+EnableDynamicAgentLoading %AMPER_JAVA_OPTIONS%
-"%AMPER_JAVA_HOME%\bin\java.exe" "-Damper.wrapper.dist.sha256=%amper_sha256%" "-Damper.wrapper.path=%~f0" %jvm_args% -cp "%amper_target_dir%\lib\*" org.jetbrains.amper.cli.MainKt %*
+"%AMPER_JAVA_HOME%\bin\java.exe" "-Damper.wrapper.dist.sha256=%amper_sha256%" "-Damper.dist.path=%amper_target_dir%" "-Damper.wrapper.path=%~f0" %jvm_args% -cp "%amper_target_dir%\lib\*" org.jetbrains.amper.cli.MainKt %*
 exit /B %ERRORLEVEL%
