@@ -11,6 +11,7 @@ import io.ktor.serialization.*
 import kotlinx.serialization.Serializable
 import java.util.Base64
 import com.github.kotlintelegrambot.entities.Message
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -100,9 +101,12 @@ class GeminiClient {
         } catch (e: JsonConvertException) {
             AppConfig.logger.error("Error processing text with Gemini: ${e.message}", e)
             null
+        } catch (e: HttpRequestTimeoutException) {
+            AppConfig.logger.warn("Gemini request timed out: ${e.message}")
+            null
         }
     }
-    
+
     suspend fun generateImageResponse(imageBytes: ByteArray, mimeType: String = "image/jpeg"): String? {
         val prompt = imagePromptTemplate ?: error("Cannot build image prompt")
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
