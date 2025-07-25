@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 import java.util.Base64
 import com.github.kotlintelegrambot.entities.Message
 
-@Resource("/v1beta/models/gemini-1.5-flash:generateContent")
+@Resource("/v1beta/models/gemini-2.5-flash:generateContent")
 data class GeminiRequestResource(val key: String = AppConfig.geminiApiKey)
 
 @Serializable
