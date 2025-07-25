@@ -1,18 +1,19 @@
 product: jvm/app
 
 dependencies:
-  - $libs.ktor.client.core
-  - $libs.ktor.client.cio
-  - $libs.ktor.client.resources
-  - $libs.ktor.client.content.negotiation
-  - $libs.ktor.serialization.kotlinx.json
+  - $ktor.client.core
+  - $ktor.client.cio
+  - $ktor.client.resources
+  - $ktor.client.contentNegotiation
+  - $ktor.serialization.kotlinx.json
   # logging
-  - $libs.ktor.client.logging
-  - $libs.logback.classic
+  - $ktor.client.logging
+  - $logback.classic
   # telegram
   - $libs.telegram
 
 settings:
+  ktor: enabled
   jvm:
     mainClass: ApplicationKt
   kotlin:
