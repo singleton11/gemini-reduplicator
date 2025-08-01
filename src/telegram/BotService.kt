@@ -49,12 +49,8 @@ class BotService(
         AppConfig.logger.info("Starting Telegram bot...")
 
         processingScope.launch {
-            flow {
-                while (true) {
-                    delay(throttleTimeMs)
-                    emit(Unit)
-                }
-            }.collect {
+            while (true) {
+                delay(throttleTimeMs)
                 AppConfig.logger.debug("Processing message buffer...")
                 val messagesToProcess = buildList {
                     while (!messageBuffer.isEmpty) {
