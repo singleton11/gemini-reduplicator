@@ -26,7 +26,7 @@ class BotService(
     private val telegramService: TelegramService,
     private val throttleTimeMs: Long = 10.seconds.inWholeMilliseconds
 ) {
-    private val processingScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val processingScope = CoroutineScope(Dispatchers.IO)
     private val botToken = AppConfig.telegramToken
     private val messageBuffer = Channel<Message>(1024)
 
@@ -50,22 +50,26 @@ class BotService(
 
         processingScope.launch {
             while (true) {
-                delay(throttleTimeMs)
-                AppConfig.logger.debug("Processing message buffer...")
-                val messagesToProcess = buildList {
-                    while (!messageBuffer.isEmpty) {
-                        messageBuffer.tryReceive().getOrNull()?.let {
-                            add(it)
+                try {
+                    delay(throttleTimeMs)
+                    AppConfig.logger.debug("Processing message buffer...")
+                    val messagesToProcess = buildList {
+                        while (!messageBuffer.isEmpty) {
+                            messageBuffer.tryReceive().getOrNull()?.let {
+                                add(it)
+                            }
                         }
                     }
-                }
 
-                AppConfig.logger.debug("Processing ${messagesToProcess.size} messages...")
+                    AppConfig.logger.debug("Processing ${messagesToProcess.size} messages...")
 
-                messagesToProcess.groupBy { it.chat.id }.forEach { (chatId, messages) ->
-                    launch {
-                        processMessagesBatch(bot, messages, chatId)
+                    messagesToProcess.groupBy { it.chat.id }.forEach { (chatId, messages) ->
+                        launch {
+                            processMessagesBatch(bot, messages, chatId)
+                        }
                     }
+                } catch (t: Throwable) {
+                    AppConfig.logger.error("Error processing message buffer: ${t.message}", t)
                 }
             }
         }
