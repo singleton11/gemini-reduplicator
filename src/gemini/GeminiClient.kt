@@ -27,7 +27,7 @@ data class GeminiContent(val parts: List<GeminiPart>) {
         val text: String? = null,
         val inlineData: InlineData? = null
     )
-    
+
     @Serializable
     data class InlineData(
         val mimeType: String,
@@ -48,35 +48,36 @@ class GeminiClient {
     companion object {
         private const val MAX_BATCH_IMAGES = 3 // Limit batch processing to 3 images max (Gemini has token limits)
     }
+
     private val httpClient = AppConfig.httpClient.config {
-        defaultRequest { 
+        defaultRequest {
             url("https://generativelanguage.googleapis.com/")
         }
     }
-    
+
     private val promptTemplate = GeminiClient::class.java
         .getResourceAsStream("/prompt-template.txt")
         ?.bufferedReader()
         ?.readText()
-        
+
     private val imagePromptTemplate = GeminiClient::class.java
         .getResourceAsStream("/image-prompt-template.txt")
         ?.bufferedReader()
         ?.readText()
-        
+
     private val batchPromptTemplate = GeminiClient::class.java
         .getResourceAsStream("/batch-prompt-template.txt")
         ?.bufferedReader()
         ?.readText()
-        
+
     private val batchImagePromptTemplate = GeminiClient::class.java
         .getResourceAsStream("/batch-image-prompt-template.txt")
         ?.bufferedReader()
         ?.readText()
-    
+
     suspend fun generateTextResponse(phrase: String): String? {
         val prompt = promptTemplate?.replace("{{ placeholder }}", phrase) ?: error("Cannot build prompt")
-        
+
         val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
             setBody(
@@ -94,7 +95,7 @@ class GeminiClient {
                 requestTimeoutMillis = 10.seconds.inWholeMilliseconds
             }
         }
-        
+
         return try {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
@@ -104,15 +105,18 @@ class GeminiClient {
         } catch (e: HttpRequestTimeoutException) {
             AppConfig.logger.warn("Gemini request timed out: ${e.message}")
             null
+        } catch (e: Exception) {
+            AppConfig.logger.error("Unexpected error processing text with Gemini: ${e.message}", e)
+            null
         }
     }
 
     suspend fun generateImageResponse(imageBytes: ByteArray, mimeType: String = "image/jpeg"): String? {
         val prompt = imagePromptTemplate ?: error("Cannot build image prompt")
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
-        
+
         AppConfig.logger.info("Processing image of size ${imageBytes.size} bytes with MIME type: $mimeType")
-        
+
         val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
             setBody(
@@ -133,7 +137,7 @@ class GeminiClient {
                 )
             )
         }
-        
+
         return try {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
@@ -142,22 +146,22 @@ class GeminiClient {
             null
         }
     }
-    
+
     /**
      * Processes a batch of text messages and generates a summary response
      */
     suspend fun generateBatchTextResponse(messages: List<String>): String? {
         if (messages.isEmpty()) return null
-        
+
         // If only one message, use the regular processing
         if (messages.size == 1) return generateTextResponse(messages.first())
-        
+
         val messagesText = messages.joinToString("\n\n") { "- $it" }
-        val prompt = batchPromptTemplate?.replace("{{ placeholder }}", messagesText) 
+        val prompt = batchPromptTemplate?.replace("{{ placeholder }}", messagesText)
             ?: error("Cannot build batch prompt")
-        
+
         AppConfig.logger.info("Processing batch of ${messages.size} messages")
-        
+
         val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
             setBody(
@@ -172,7 +176,7 @@ class GeminiClient {
                 )
             )
         }
-        
+
         return try {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
@@ -181,20 +185,20 @@ class GeminiClient {
             null
         }
     }
-    
+
     /**
      * Extract text content from a list of Telegram messages
      */
     private fun extractTextContent(messages: List<Message>): List<String> {
         return messages.mapNotNull { it.text }.filter { it.isNotBlank() }
     }
-    
+
     /**
      * Process a batch of mixed Telegram messages, including text and images
      */
     suspend fun processBatchMessages(messages: List<Message>, telegramService: telegram.TelegramService): String? {
         if (messages.isEmpty()) return null
-        
+
         // If there's only one message, use the regular processing
         if (messages.size == 1) {
             val message = messages.first()
@@ -204,36 +208,38 @@ class GeminiClient {
                     val fileInfo = telegramService.downloadImage(message)
                     fileInfo?.let { generateImageResponse(it.bytes, it.mimeType) }
                 }
+
                 message.sticker != null -> {
                     val fileInfo = telegramService.downloadSticker(message)
                     fileInfo?.let { generateImageResponse(it.bytes, it.mimeType) }
                 }
+
                 else -> null
             }
         }
-        
+
         // Extract text content
         val textContents = extractTextContent(messages)
-        
+
         // If we only have text messages, use the batch text processor
         if (textContents.size == messages.size) {
             return generateBatchTextResponse(textContents)
         }
-        
+
         // We have a mix of content types - handle differently
         val parts = mutableListOf<GeminiContent.GeminiPart>()
         var imageCount = 0
-        
+
         // First add images (limited to MAX_BATCH_IMAGES)
         for (message in messages) {
             if (imageCount >= MAX_BATCH_IMAGES) break
-            
+
             val fileInfo = when {
                 message.photo != null -> telegramService.downloadImage(message)
                 message.sticker != null -> telegramService.downloadSticker(message)
                 else -> null
             }
-            
+
             if (fileInfo != null) {
                 imageCount++
                 AppConfig.logger.info("Adding image ${imageCount} to batch")
@@ -247,21 +253,21 @@ class GeminiClient {
                 )
             }
         }
-        
+
         // Then add text content and prompt
         val textDescription = if (textContents.isNotEmpty()) {
             "\nThese messages were also included: \n" + textContents.joinToString("\n\n") { "- $it" }
         } else {
             ""
         }
-        
-        val promptText = batchImagePromptTemplate?.replace("{{ text_content }}", textDescription) 
+
+        val promptText = batchImagePromptTemplate?.replace("{{ text_content }}", textDescription)
             ?: error("Cannot build batch image prompt")
-        
+
         parts.add(GeminiContent.GeminiPart(text = promptText))
-        
+
         AppConfig.logger.info("Processing batch with ${parts.size - 1} images and ${textContents.size} text messages")
-        
+
         val response = httpClient.post(GeminiRequestResource()) {
             contentType(ContentType.Application.Json)
             setBody(
@@ -272,7 +278,7 @@ class GeminiClient {
                 )
             )
         }
-        
+
         return try {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
