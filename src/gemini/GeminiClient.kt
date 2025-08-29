@@ -197,7 +197,7 @@ class GeminiClient {
      * Process a batch of mixed Telegram messages, including text and images
      */
     suspend fun processBatchMessages(messages: List<Message>, telegramService: telegram.TelegramService): String? {
-        if (messages.isEmpty()) return null
+        require(messages.isNotEmpty()) { "Cannot process empty message batch" }
 
         // If there's only one message, use the regular processing
         if (messages.size == 1) {
@@ -282,8 +282,8 @@ class GeminiClient {
         return try {
             val resp = response.body<GeminiResponse>()
             resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
-        } catch (e: Exception) {
-            AppConfig.logger.error("Error processing batch messages with Gemini: ${e.message}", e)
+        } catch (t: Throwable) {
+            AppConfig.logger.error("Error processing batch messages with Gemini: ${t.message}", t)
             null
         }
     }

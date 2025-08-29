@@ -9,16 +9,8 @@ import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.logging.LogLevel
 import config.AppConfig
 import gemini.GeminiClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlin.time.Duration.Companion.seconds
 
 class BotService(
@@ -26,7 +18,7 @@ class BotService(
     private val telegramService: TelegramService,
     private val throttleTimeMs: Long = 10.seconds.inWholeMilliseconds
 ) {
-    private val processingScope = CoroutineScope(Dispatchers.IO)
+    private val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val botToken = AppConfig.telegramToken
     private val messageBuffer = Channel<Message>(1024)
 
@@ -51,14 +43,16 @@ class BotService(
         processingScope.launch {
             while (true) {
                 try {
-                    delay(throttleTimeMs)
                     AppConfig.logger.debug("Processing message buffer...")
                     val messagesToProcess = buildList {
-                        while (!messageBuffer.isEmpty) {
-                            messageBuffer.tryReceive().getOrNull()?.let {
-                                add(it)
+                        val job = launch {
+                            while (isActive) {
+                                add(messageBuffer.receive())
                             }
                         }
+
+                        delay(throttleTimeMs)
+                        job.cancel()
                     }
 
                     AppConfig.logger.debug("Processing ${messagesToProcess.size} messages...")
@@ -77,14 +71,12 @@ class BotService(
         bot.startPolling()
     }
 
+
     /**
      * Process a batch of messages for a specific chat
      */
     private suspend fun processMessagesBatch(bot: Bot, messages: List<Message>, chatId: Long) {
-        if (messages.isEmpty()) {
-            AppConfig.logger.debug("No messages to process for chat $chatId")
-            return
-        }
+        require(messages.isNotEmpty()) { "Cannot process empty message batch" } // check invariant
 
         // Log how many messages we're processing
         AppConfig.logger.info("Processing batch of ${messages.size} messages for chat $chatId")
@@ -95,11 +87,10 @@ class BotService(
         // Send the response
         if (response != null) {
             // Reply to the last message in the batch
-            val replyToMessageId = messages.lastOrNull()?.messageId
             bot.sendMessage(
                 ChatId.fromId(chatId),
                 response,
-                replyToMessageId = replyToMessageId
+                replyToMessageId = messages.singleOrNull()?.messageId
             )
         } else {
             AppConfig.logger.warn("Failed to get response from Gemini for chat $chatId batch")
