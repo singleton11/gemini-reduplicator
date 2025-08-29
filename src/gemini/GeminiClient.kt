@@ -199,25 +199,6 @@ class GeminiClient {
     suspend fun processBatchMessages(messages: List<Message>, telegramService: telegram.TelegramService): String? {
         require(messages.isNotEmpty()) { "Cannot process empty message batch" }
 
-        // If there's only one message, use the regular processing
-        if (messages.size == 1) {
-            val message = messages.first()
-            return when {
-                message.text != null -> generateTextResponse(message.text!!)
-                message.photo != null -> {
-                    val fileInfo = telegramService.downloadImage(message)
-                    fileInfo?.let { generateImageResponse(it.bytes, it.mimeType) }
-                }
-
-                message.sticker != null -> {
-                    val fileInfo = telegramService.downloadSticker(message)
-                    fileInfo?.let { generateImageResponse(it.bytes, it.mimeType) }
-                }
-
-                else -> null
-            }
-        }
-
         // Extract text content
         val textContents = extractTextContent(messages)
 
