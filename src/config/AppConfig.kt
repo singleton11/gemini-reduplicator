@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 
 object AppConfig {
     val logger: Logger = LoggerFactory.getLogger("GeminiReducplicator")
-    
+
     val geminiApiKey: String = System.getenv("GEMINI_API_KEY") ?: error("GEMINI_API_KEY environment variable is not set")
     val telegramToken: String = System.getenv("TELEGRAM_TOKEN") ?: error("TELEGRAM_TOKEN environment variable is not set")
     

@@ -18,6 +18,7 @@ class BotService(
     private val telegramService: TelegramService,
     private val throttleTimeMs: Long = 10.seconds.inWholeMilliseconds
 ) {
+    private val loopScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val botToken = AppConfig.telegramToken
     private val messageBuffer = Channel<Message>(1024)
@@ -40,25 +41,24 @@ class BotService(
 
         AppConfig.logger.info("Starting Telegram bot...")
 
-        processingScope.launch {
-            while (true) {
+        loopScope.launch {
+            while (isActive) {
                 try {
                     AppConfig.logger.debug("Processing message buffer...")
+
                     val messagesToProcess = buildList {
-                        val job = launch {
-                            while (isActive) {
+                        try {
+                            withTimeout(throttleTimeMs) {
                                 add(messageBuffer.receive())
                             }
+                        } catch (_: CancellationException) {
                         }
-
-                        delay(throttleTimeMs)
-                        job.cancel()
                     }
 
                     AppConfig.logger.debug("Processing ${messagesToProcess.size} messages...")
 
                     messagesToProcess.groupBy { it.chat.id }.forEach { (chatId, messages) ->
-                        launch {
+                        processingScope.launch {
                             processMessagesBatch(bot, messages, chatId)
                         }
                     }

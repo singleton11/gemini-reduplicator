@@ -13,9 +13,7 @@ import java.util.Base64
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.DurationUnit
 
 @Resource("/v1beta/models/gemini-2.5-flash:generateContent")
 data class GeminiRequestResource(val key: String = AppConfig.geminiApiKey)
@@ -107,42 +105,6 @@ class GeminiClient {
             null
         } catch (e: Exception) {
             AppConfig.logger.error("Unexpected error processing text with Gemini: ${e.message}", e)
-            null
-        }
-    }
-
-    suspend fun generateImageResponse(imageBytes: ByteArray, mimeType: String = "image/jpeg"): String? {
-        val prompt = imagePromptTemplate ?: error("Cannot build image prompt")
-        val base64Image = Base64.getEncoder().encodeToString(imageBytes)
-
-        AppConfig.logger.info("Processing image of size ${imageBytes.size} bytes with MIME type: $mimeType")
-
-        val response = httpClient.post(GeminiRequestResource()) {
-            contentType(ContentType.Application.Json)
-            setBody(
-                GeminiRequest(
-                    listOf(
-                        GeminiContent(
-                            listOf(
-                                GeminiContent.GeminiPart(
-                                    inlineData = GeminiContent.InlineData(
-                                        mimeType = mimeType,
-                                        data = base64Image
-                                    )
-                                ),
-                                GeminiContent.GeminiPart(text = prompt)
-                            )
-                        )
-                    )
-                )
-            )
-        }
-
-        return try {
-            val resp = response.body<GeminiResponse>()
-            resp.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
-        } catch (e: Exception) {
-            AppConfig.logger.error("Error processing image with Gemini: ${e.message}", e)
             null
         }
     }
